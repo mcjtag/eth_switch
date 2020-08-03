@@ -40,6 +40,7 @@
 
 module eth_switch #(
 	parameter PORT_NUM = 8,
+	parameter ADDR_WIDTH = 8,
 	parameter ETHERNET_MTU = 1500,
 	parameter FLOODING_ENABLE = 0,
 	parameter CRC_CHECK = 0
@@ -70,14 +71,14 @@ wire [PORT_NUM*PORT_WIDTH-1:0]m_axis_table_request_tuser;
 wire [PORT_NUM-1:0]m_axis_table_request_tvalid;
 wire [PORT_NUM-1:0]m_axis_table_request_tready;
 
-wire [PORT_NUM*4-1:0]s_axis_table_response_tdata;
-wire [PORT_NUM*PORT_WIDTH*2-1:0]s_axis_table_response_tuser;
-wire [PORT_NUM-1:0]s_axis_table_response_tvalid;
-
-wire [96-1-1:0]s_axis_table_request_tdata;
+wire [95:0]s_axis_table_request_tdata;
 wire [PORT_WIDTH-1:0]s_axis_table_request_tuser;
 wire s_axis_table_request_tvalid;
 wire s_axis_table_request_tready;
+
+wire [3:0]s_axis_table_response_tdata;
+wire [PORT_WIDTH*2-1:0]s_axis_table_response_tuser;
+wire s_axis_table_response_tvalid;
 
 genvar g;
 
@@ -106,9 +107,9 @@ generate for (g = 0; g < PORT_NUM; g = g + 1) begin : CHANNEL_IN
 		.m_axis_table_request_tuser(m_axis_table_request_tuser[PORT_WIDTH*(g+1)-1-:PORT_WIDTH]),
 		.m_axis_table_request_tvalid(m_axis_table_request_tvalid[g]),
 		.m_axis_table_request_tready(m_axis_table_request_tready[g]),
-		.s_axis_table_response_tdata(s_axis_table_response_tdata[4*(g+1)-1-:4]),
-		.s_axis_table_response_tuser(s_axis_table_response_tuser[PORT_WIDTH*2*(g+1)-1-:PORT_WIDTH*2]),
-		.s_axis_table_response_tvalid(s_axis_table_response_tvalid[g]),
+		.s_axis_table_response_tdata(s_axis_table_response_tdata),
+		.s_axis_table_response_tuser(s_axis_table_response_tuser),
+		.s_axis_table_response_tvalid(s_axis_table_response_tvalid),
 		.m_axis_status_tdata(),
 		.m_axis_status_tvalid()
 	);
@@ -150,6 +151,21 @@ axis_interconnect #(
 	.m_axis_tvalid(s_axis_table_request_tvalid),
 	.m_axis_tready(s_axis_table_request_tready),
 	.m_axis_tlast()
+);
+
+mactable #(
+	.ADDR_WIDTH(ADDR_WIDTH),
+	.PORT_WIDTH(PORT_WIDTH)
+) mactable_inst (
+	.aclk(aclk),
+	.aresetn(aresetn),
+	.s_axis_table_request_tdata(s_axis_table_request_tdata),
+	.s_axis_table_request_tuser(s_axis_table_request_tuser),
+	.s_axis_table_request_tvalid(s_axis_table_request_tvalid),
+	.s_axis_table_request_tready(s_axis_table_request_tready),
+	.m_axis_table_response_tdata(s_axis_table_response_tdata),
+	.m_axis_table_response_tuser(s_axis_table_response_tuser),
+	.m_axis_table_response_tvalid(s_axis_table_response_tvalid)
 );
 
 endmodule
