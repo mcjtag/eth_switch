@@ -5,11 +5,11 @@
 // 
 // Create Date: 02.08.2020 17:12:29
 // Design Name: 
-// Module Name: mactable_tcam
+// Module Name: mactable_cam
 // Project Name: eth_switch
 // Target Devices: 
 // Tool Versions: 
-// Description: 
+// Description: CAM MAC-address table
 // 
 // Dependencies: 
 // 
@@ -38,13 +38,12 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
-module mactable_tcam #(
+module mactable_cam #(
 	parameter ADDR_WIDTH = 4,
 	parameter KEY_WIDTH = 4,
 	parameter DATA_WIDTH = 4,
-	parameter MASK_DISABLE = 0,
 	parameter RAM_STYLE_DATA = "block",
-	parameter CONFIG_WIDTH = ADDR_WIDTH+DATA_WIDTH+KEY_WIDTH*2,
+	parameter CONFIG_WIDTH = ADDR_WIDTH+DATA_WIDTH+KEY_WIDTH,
 	parameter REQUEST_WIDTH = KEY_WIDTH,
 	parameter RESPONSE_WIDTH = ADDR_WIDTH+DATA_WIDTH
 )
@@ -67,12 +66,10 @@ module mactable_tcam #(
 localparam ADDR_OFFSET = ADDR_WIDTH;
 localparam DATA_OFFSET = ADDR_OFFSET+DATA_WIDTH;
 localparam KEY_OFFSET = DATA_OFFSET+KEY_WIDTH;
-localparam MASK_OFFSET = KEY_OFFSET+KEY_WIDTH;
 
 wire [ADDR_WIDTH-1:0]set_addr; 
 wire [DATA_WIDTH-1:0]set_data;
 wire [KEY_WIDTH-1:0]set_key;
-wire [KEY_WIDTH-1:0]set_xmask;
 wire set_clr;
 wire set_valid;
 wire [KEY_WIDTH-1:0]req_key;
@@ -92,7 +89,6 @@ wire enc_null;
 assign set_addr = s_axis_config_tdata[ADDR_OFFSET-1-:ADDR_WIDTH]; 
 assign set_data = s_axis_config_tdata[DATA_OFFSET-1-:DATA_WIDTH];
 assign set_key = s_axis_config_tdata[KEY_OFFSET-1-:KEY_WIDTH];
-assign set_xmask = s_axis_config_tdata[MASK_OFFSET-1-:KEY_WIDTH];
 assign set_clr = s_axis_config_tuser;
 assign set_valid = s_axis_config_tvalid;
 
@@ -120,16 +116,14 @@ always @(posedge aclk) begin
 	end
 end
 
-mactable_tcam_line_array #(
+mactable_cam_line_array #(
 	.ADDR_WIDTH(ADDR_WIDTH),
-	.KEY_WIDTH(KEY_WIDTH),
-	.MASK_DISABLE(MASK_DISABLE)
-) mactable_tcam_line_array_inst (
+	.KEY_WIDTH(KEY_WIDTH)
+) mactable_cam_line_array_inst (
 	.clk(aclk),
 	.rst(~aresetn),
 	.set_addr(set_addr),
 	.set_key(set_key),
-	.set_xmask(set_xmask),
 	.set_clr(set_clr),
 	.set_valid(set_valid),
 	.req_key(req_key),
@@ -137,9 +131,9 @@ mactable_tcam_line_array #(
 	.line_match(line_match)
 );
 
-mactable_tcam_line_encoder #(
+mactable_cam_line_encoder #(
 	.ADDR_WIDTH(ADDR_WIDTH)
-) mactable_tcam_line_encoder_inst (
+) mactable_cam_line_encoder_inst (
 	.clk(aclk),
 	.rst(~aresetn),
 	.line_match(line_match),
@@ -149,11 +143,11 @@ mactable_tcam_line_encoder #(
 	.addr_null(enc_null)
 );
 
-mactable_tcam_sdpram #(
+mactable_cam_sdpram #(
 	.ADDR_WIDTH(ADDR_WIDTH),
 	.DATA_WIDTH(DATA_WIDTH),
 	.RAM_STYLE(RAM_STYLE_DATA)
-) mactable_tcam_sdpram_inst (
+) mactable_cam_sdpram_inst (
 	.clk(aclk),
 	.rst(~aresetn),
 	.dina(set_data),
@@ -166,21 +160,19 @@ mactable_tcam_sdpram #(
 endmodule
 
 //////////////////////////////////////////////////////////////////////////////////
-// Module Name: mactable_tcam_line_array
+// Module Name: mactable_cam_line_array
 // Project Name: eth_switch
-// Description: TCAM Index Memory Array
+// Description: CAM Index Memory Array
 //////////////////////////////////////////////////////////////////////////////////
-module mactable_tcam_line_array #(
+module mactable_cam_line_array #(
 	parameter ADDR_WIDTH = 8,
-	parameter KEY_WIDTH = 8,
-	parameter MASK_DISABLE = 0
+	parameter KEY_WIDTH = 8
 )
 (
 	input wire clk,
 	input wire rst,
 	input wire [ADDR_WIDTH-1:0]set_addr,
 	input wire [KEY_WIDTH-1:0]set_key,
-	input wire [KEY_WIDTH-1:0]set_xmask,
 	input wire set_clr,
 	input wire set_valid,
 	input wire [KEY_WIDTH-1:0]req_key,
@@ -188,13 +180,12 @@ module mactable_tcam_line_array #(
 	output wire [2**ADDR_WIDTH-1:0]line_match
 );
 
-localparam MEM_WIDTH = (MASK_DISABLE) ? KEY_WIDTH : KEY_WIDTH*2;
+localparam MEM_WIDTH = KEY_WIDTH;
 
 reg [MEM_WIDTH-1:0]mem[2**ADDR_WIDTH-1:0];
 reg [2**ADDR_WIDTH-1:0]active;
 reg [2**ADDR_WIDTH-1:0]match;
 wire [KEY_WIDTH-1:0]key[2**ADDR_WIDTH-1:0];
-wire [KEY_WIDTH-1:0]xmask[2**ADDR_WIDTH-1:0];
 
 integer i;
 genvar g;
@@ -202,13 +193,7 @@ genvar g;
 generate for (g = 0; g < 2**ADDR_WIDTH; g = g + 1) begin
 	wire [MEM_WIDTH-1:0]mem_tmp;
 	assign mem_tmp = mem[g];
-	if (MASK_DISABLE) begin
-		assign key[g] = mem_tmp;
-		assign xmask[g] = {KEY_WIDTH{1'b0}};
-	end else begin
-		assign key[g] = mem_tmp[KEY_WIDTH-1-:KEY_WIDTH];
-		assign xmask[g] = mem_tmp[KEY_WIDTH*2-1-:KEY_WIDTH];
-	end
+	assign key[g] = mem_tmp;
 end endgenerate
 
 assign line_match = match;
@@ -228,11 +213,7 @@ always @(posedge clk) begin
 		if (set_valid == 1'b1) begin
 			for (i = 0; i < 2**ADDR_WIDTH; i = i + 1) begin
 				if (set_addr == i) begin
-					if (MASK_DISABLE) begin
-						mem[i] <= set_key;
-					end else begin
-						mem[i] <= {set_xmask, set_key};
-					end
+					mem[i] <= set_key;
 					active[i] <= ~set_clr;
 				end
 			end
@@ -247,11 +228,7 @@ always @(posedge clk) begin
 	end else begin
 		if (req_valid == 1'b1) begin
 			for (i = 0; i < 2**ADDR_WIDTH; i = i + 1) begin
-				if (MASK_DISABLE) begin
-					match[i] <= ((key[i] ^ req_key) == 0) & active[i];
-				end else begin
-					match[i] <= ((key[i] ^ req_key & ~xmask[i]) == 0) & active[i];
-				end
+				match[i] <= ((key[i] ^ req_key) == 0) & active[i];
 			end
 		end
 	end
@@ -260,11 +237,11 @@ end
 endmodule
 
 //////////////////////////////////////////////////////////////////////////////////
-// Module Name: mactable_tcam_line_encoder
+// Module Name: mactable_cam_line_encoder
 // Project Name: eth_switch
-// Description: TCAM Matched Lines Encoder
+// Description: CAM Matched Lines Encoder
 //////////////////////////////////////////////////////////////////////////////////
-module mactable_tcam_line_encoder #(
+module mactable_cam_line_encoder #(
 	parameter ADDR_WIDTH = 8
 )
 (
@@ -334,11 +311,11 @@ end
 endmodule
 
 //////////////////////////////////////////////////////////////////////////////////
-// Module Name: mactable_tcam_sdpram
+// Module Name: mactable_cam_sdpram
 // Project Name: eth_switch
-// Description: TCAM Data Memory
+// Description: CAM Data Memory
 //////////////////////////////////////////////////////////////////////////////////
-module mactable_tcam_sdpram #(
+module mactable_cam_sdpram #(
 	parameter ADDR_WIDTH = 8,
 	parameter DATA_WIDTH = 8,
 	parameter RAM_STYLE = "block"
