@@ -43,7 +43,8 @@ module channel_in #(
 	parameter PORT_HIGH = 15,
 	parameter ETHERNET_MTU = 1500,
 	parameter FLOODING_ENABLE = 0,
-	parameter CRC_CHECK = 0
+	parameter CRC_CHECK = 0,
+	parameter PORT_WIDTH = $clog2(PORT_HIGH+1)
 )
 (
 	input wire aclk,
@@ -55,18 +56,18 @@ module channel_in #(
 	input wire s_axis_tlast,
 	// Outcome frames
 	output wire [7:0]m_axis_tdata,
-	output wire [3:0]m_axis_tdest,
+	output wire [PORT_WIDTH-1:0]m_axis_tdest,
 	output wire m_axis_tvalid,
 	input wire m_axis_tready,
 	output wire m_axis_tlast,
 	// Table read request
-	output wire [63:0]m_axis_table_request_tdata,
-	output wire [63:0]m_axis_table_request_tuser,
+	output wire [95:0]m_axis_table_request_tdata,
+	output wire [PORT_WIDTH-1:0]m_axis_table_request_tuser,
 	output wire m_axis_table_request_tvalid,
 	input wire m_axis_table_request_tready,
 	// Table read response
-	input wire [7:0]s_axis_table_response_tdata,
-	input wire [3:0]s_axis_table_response_tuser,
+	input wire [3:0]s_axis_table_response_tdata,
+	input wire [PORT_WIDTH*2-1:0]s_axis_table_response_tuser,
 	input wire s_axis_table_response_tvalid,
 	// Status: {frames, dropped, error_crc, error_len}
 	output wire [127:0]m_axis_status_tdata,
@@ -156,7 +157,7 @@ reg [47:0]mac_dst;
 reg [47:0]mac_src;
 
 /* Port destination */
-reg [3:0]port_dst;
+reg [PORT_WIDTH-1:0]port_dst;
 
 /* Status counters */
 reg status_valid;
@@ -214,8 +215,8 @@ reg request_valid;
 wire request_done;
 wire response_valid;
 wire [3:0]response_status;
-wire [3:0]response_port_dst;
-wire [3:0]response_port_src;
+wire [PORT_WIDTH-1:0]response_port_dst;
+wire [PORT_WIDTH-1:0]response_port_src;
 
 assign mux_select = flow[1:0];
 assign demux_select = flow[3:2];
@@ -227,15 +228,15 @@ assign outcome_last = m_axis_tvalid & m_axis_tready & m_axis_tlast;
 
 assign m_axis_tdest = port_dst;
 
-assign m_axis_table_request_tdata = mac_dst;
-assign m_axis_table_request_tuser = {PORT_ADDR,mac_src};
+assign m_axis_table_request_tdata = {mac_src,mac_dst};
+assign m_axis_table_request_tuser = PORT_ADDR;
 assign m_axis_table_request_tvalid = request_valid;
 
 assign request_done = m_axis_table_request_tvalid & m_axis_table_request_tready;
 assign response_valid = s_axis_table_response_tvalid;
-assign response_status = s_axis_table_response_tdata[7:4];
-assign response_port_dst = s_axis_table_response_tdata[3:0];
-assign response_port_src = s_axis_table_response_tuser[3:0];
+assign response_status = s_axis_table_response_tdata[3:0];
+assign response_port_dst = s_axis_table_response_tuser[PORT_WIDTH*1-1-:PORT_WIDTH];
+assign response_port_src = s_axis_table_response_tuser[PORT_WIDTH*2-1-:PORT_WIDTH];
 
 assign m_axis_status_tdata = {status_frames,status_dropped,status_error_crc,status_error_len};
 assign m_axis_status_tvalid = status_valid;
