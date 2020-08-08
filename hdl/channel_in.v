@@ -218,15 +218,21 @@ wire [3:0]response_status;
 wire [PORT_WIDTH-1:0]response_port_dst;
 wire [PORT_WIDTH-1:0]response_port_src;
 
+wire [7:0]m_axis_out_tdata;
+wire [PORT_WIDTH-1:0]m_axis_out_tdest;
+wire m_axis_out_tvalid;
+wire m_axis_out_tready;
+wire m_axis_out_tlast;
+
 assign mux_select = flow[1:0];
 assign demux_select = flow[3:2];
 
 assign income_valid = s_axis_tvalid & s_axis_tready;
 assign income_last = s_axis_tvalid & s_axis_tready & s_axis_tlast;
-assign outcome_valid = m_axis_tvalid & m_axis_tready;
-assign outcome_last = m_axis_tvalid & m_axis_tready & m_axis_tlast;
+assign outcome_valid = m_axis_out_tvalid & m_axis_out_tready;
+assign outcome_last = m_axis_out_tvalid & m_axis_out_tready & m_axis_out_tlast;
 
-assign m_axis_tdest = port_dst;
+assign m_axis_out_tdest = port_dst;
 
 assign m_axis_table_request_tdata = {mac_src,mac_dst};
 assign m_axis_table_request_tuser = PORT_ADDR;
@@ -529,8 +535,10 @@ axis_mux2 #(
 frame_fifo #(
 	.PACKET_MODE(1),
 	.PACKET_MAXNUM(2),
-	.DATA_WIDTH(8)
-) frame_fifo_inst (
+	.DATA_WIDTH(8),
+	.FIFO_DEPTH(2048),
+	.RAM_STYLE("block")
+) frame_fifo_in_inst (
 	.aclk(aclk),
 	.aresetn(aresetn & ~fifo_rst),
 	.s_axis_tdata(mux_m_data),
@@ -551,15 +559,34 @@ axis_demux2 #(
 	.s_axis_tvalid(fifo_valid),
 	.s_axis_tready(fifo_ready),
 	.s_axis_tlast(fifo_last),
-	.m0_axis_tdata(m_axis_tdata),
-	.m0_axis_tvalid(m_axis_tvalid),
-	.m0_axis_tready(m_axis_tready),
-	.m0_axis_tlast(m_axis_tlast),
+	.m0_axis_tdata(m_axis_out_tdata),
+	.m0_axis_tvalid(m_axis_out_tvalid),
+	.m0_axis_tready(m_axis_out_tready),
+	.m0_axis_tlast(m_axis_out_tlast),
 	.m1_axis_tdata(demux_m1_data),
 	.m1_axis_tvalid(demux_m1_valid),
 	.m1_axis_tready(demux_m1_ready),
 	.m1_axis_tlast(demux_m1_last),
 	.select(demux_select)
+);
+
+frame_fifo #(
+	.PACKET_MODE(0),
+	.PACKET_MAXNUM(1),
+	.DATA_WIDTH(8+PORT_WIDTH),
+	.FIFO_DEPTH(16),
+	.RAM_STYLE("distributed")
+) frame_fifo_out_inst (
+	.aclk(aclk),
+	.aresetn(aresetn),
+	.s_axis_tdata({m_axis_out_tdata,m_axis_out_tdest}),
+	.s_axis_tvalid(m_axis_out_tvalid),
+	.s_axis_tready(m_axis_out_tready),
+	.s_axis_tlast(m_axis_out_tlast),
+	.m_axis_tdata({m_axis_tdata,m_axis_tdest}),
+	.m_axis_tvalid(m_axis_tvalid),
+	.m_axis_tready(m_axis_tready),
+	.m_axis_tlast(m_axis_tlast)
 );
 
 endmodule
@@ -831,6 +858,7 @@ module frame_fifo #(
 	parameter PACKET_MODE = 0,
 	parameter PACKET_MAXNUM = 32, // MAX
 	parameter DATA_WIDTH = 8,
+	parameter FIFO_DEPTH = 2048,
 	parameter RAM_STYLE = "block"
 )
 (
@@ -904,8 +932,7 @@ generate if (PACKET_MODE) begin
 end endgenerate
 
 localparam FIFO_WIDTH = DATA_WIDTH + 1;
-localparam FIFO_DEPTH = 2048;
-localparam ADDR_WIDTH = $clog2(FIFO_WIDTH);
+localparam ADDR_WIDTH = $clog2(FIFO_DEPTH);
 
 /* RAM */
 (* ram_style = RAM_STYLE *)
@@ -941,7 +968,7 @@ assign fifo_do = ram_doutb;
 assign wr_valid = fifo_wren & ~flag_full;
 assign rd_valid = tmp_rd_en & ~flag_empty;
 assign fifo_full = flag_full;
-assign valid = dout_valid;
+//assign valid = dout_valid;
 
 assign fifo_empty = !dout_valid;
 assign tmp_rd_en = !flag_empty && (!dout_valid || fifo_rden);
