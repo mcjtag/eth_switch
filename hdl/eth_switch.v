@@ -43,7 +43,9 @@ module eth_switch #(
 	parameter ADDR_WIDTH = 8,
 	parameter ETHERNET_MTU = 1500,
 	parameter FLOODING_ENABLE = 0,
-	parameter CRC_CHECK = 0
+	parameter CRC_CHECK = 0,
+	parameter RAM_STYLE_DATA = "block",	/* "block" or "distributed" */
+	parameter MODE = "static"			/* "static or "dynamic" */
 )
 (
 	input wire aclk,
@@ -55,7 +57,10 @@ module eth_switch #(
 	output wire [PORT_NUM*8-1:0]m_axis_tdata,
 	output wire [PORT_NUM-1:0]m_axis_tvalid,
 	input wire [PORT_NUM-1:0]m_axis_tready,
-	output wire [PORT_NUM-1:0]m_axis_tlast
+	output wire [PORT_NUM-1:0]m_axis_tlast,
+	input wire [ADDR_WIDTH+$clog2(PORT_NUM)+47:0]s_axis_config_tdata,
+	input wire s_axis_config_tuser,
+	input wire s_axis_config_tvalid
 );
 
 localparam PORT_WIDTH = $clog2(PORT_NUM);
@@ -155,7 +160,9 @@ axis_interconnect #(
 
 mactable #(
 	.ADDR_WIDTH(ADDR_WIDTH),
-	.PORT_WIDTH(PORT_WIDTH)
+	.PORT_WIDTH(PORT_WIDTH),
+	.RAM_STYLE_DATA("block"),
+	.MODE("dynamic")
 ) mactable_inst (
 	.aclk(aclk),
 	.aresetn(aresetn),
@@ -165,7 +172,10 @@ mactable #(
 	.s_axis_table_request_tready(s_axis_table_request_tready),
 	.m_axis_table_response_tdata(s_axis_table_response_tdata),
 	.m_axis_table_response_tuser(s_axis_table_response_tuser),
-	.m_axis_table_response_tvalid(s_axis_table_response_tvalid)
+	.m_axis_table_response_tvalid(s_axis_table_response_tvalid),
+	.s_axis_table_config_tdata(s_axis_config_tdata),
+	.s_axis_table_config_tuser(s_axis_config_tuser),
+	.s_axis_table_config_tvalid(s_axis_config_tvalid)
 );
 
 endmodule
