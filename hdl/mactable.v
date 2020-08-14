@@ -92,7 +92,6 @@ reg [PORT_WIDTH-1:0]port_src;
 reg [PORT_WIDTH-1:0]port_dst;
 reg [ADDR_WIDTH-1:0]port_addr;
 reg [ADDR_WIDTH-1:0]curr_addr;
-reg new_addr;
 
 reg [CONFIG_WIDTH-1:0]config_data;
 reg config_user;
@@ -132,7 +131,6 @@ always @(posedge aclk) begin
 		status <= 0;
 		request_valid <= 1'b0;
 		curr_addr <= 0;
-		new_addr <= 1'b0;
 		config_data <= 0;
 		config_user <= 1'b0;
 		config_valid <= 1'b0;
@@ -188,25 +186,24 @@ always @(posedge aclk) begin
 		end
 		STATE_SRC_RESOLVE_RES: begin
 			if (response_valid == 1'b1) begin
-				{port_src, port_addr} <= response_data;
 				if (response_user == 1'b1) begin
-					new_addr <= 1'b1;
+					state <= STATE_SRC_UPDATE;
 				end else begin
-					new_addr <= 1'b0;
+					port_addr <= response_data[ADDR_WIDTH-1:0];
+					if (port_src == response_data[ADDR_WIDTH+PORT_WIDTH-1:ADDR_WIDTH]) begin
+						state <= STATE_REQUEST;
+					end else begin
+						state <= STATE_SRC_UPDATE;	
+					end
 				end
-				state <= STATE_SRC_UPDATE;
 			end
 		end
 		STATE_SRC_UPDATE: begin
 			if (config_valid == 1'b0) begin
 				config_valid <= 1'b1;
-				if (new_addr == 1'b1) begin
-					config_data <= {mac_src,port_src,curr_addr};
-					curr_addr <= curr_addr + 1;
-				end else begin
-					config_data <= {mac_src,port_src,port_addr};
-				end
+				config_data <= {mac_src,port_src,curr_addr};
 				config_user <= 1'b0;
+				curr_addr <= curr_addr + 1;
 			end else begin
 				config_valid <= 1'b0;
 				state <= STATE_REQUEST;
