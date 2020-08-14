@@ -63,10 +63,6 @@ module mactable_cam #(
 	output wire m_axis_response_tvalid
 );
 
-localparam ADDR_OFFSET = ADDR_WIDTH;
-localparam DATA_OFFSET = ADDR_OFFSET+DATA_WIDTH;
-localparam KEY_OFFSET = DATA_OFFSET+KEY_WIDTH;
-
 wire [ADDR_WIDTH-1:0]set_addr; 
 wire [DATA_WIDTH-1:0]set_data;
 wire [KEY_WIDTH-1:0]set_key;
@@ -86,9 +82,7 @@ wire [ADDR_WIDTH-1:0]enc_addr;
 wire enc_valid;
 wire enc_null;
 
-assign set_addr = s_axis_config_tdata[ADDR_OFFSET-1-:ADDR_WIDTH]; 
-assign set_data = s_axis_config_tdata[DATA_OFFSET-1-:DATA_WIDTH];
-assign set_key = s_axis_config_tdata[KEY_OFFSET-1-:KEY_WIDTH];
+assign {set_key,set_data,set_addr} = s_axis_config_tdata; 
 assign set_clr = s_axis_config_tuser;
 assign set_valid = s_axis_config_tvalid;
 
