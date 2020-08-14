@@ -71,7 +71,7 @@ wire [PORT_NUM-1:0]m_axis_chan_tvalid;
 wire [PORT_NUM-1:0]m_axis_chan_tready;
 wire [PORT_NUM-1:0]m_axis_chan_tlast;
 
-wire [PORT_NUM*96-1-1:0]m_axis_table_request_tdata;
+wire [PORT_NUM*96-1:0]m_axis_table_request_tdata;
 wire [PORT_NUM*PORT_WIDTH-1:0]m_axis_table_request_tuser;
 wire [PORT_NUM-1:0]m_axis_table_request_tvalid;
 wire [PORT_NUM-1:0]m_axis_table_request_tready;
@@ -143,16 +143,19 @@ axis_interconnect #(
 axis_interconnect #(
 	.CHANNELS_IN(PORT_NUM),
 	.CHANNELS_OUT(1),
-	.DATA_WIDTH(96+PORT_WIDTH)
+	.DATA_WIDTH(96),
+	.USER_WIDTH(PORT_WIDTH)
 ) axis_interconnect_table (
 	.aclk(aclk),
 	.aresetn(aresetn),
-	.s_axis_tdata({m_axis_table_request_tdata,m_axis_table_request_tuser}),
+	.s_axis_tdata(m_axis_table_request_tdata),
+	.s_axis_tuser(m_axis_table_request_tuser),
 	.s_axis_tdest(),
 	.s_axis_tvalid(m_axis_table_request_tvalid),
 	.s_axis_tready(m_axis_table_request_tready),
-	.s_axis_tlast(1'b1),
-	.m_axis_tdata({s_axis_table_request_tdata,s_axis_table_request_tuser}),
+	.s_axis_tlast({PORT_NUM{1'b1}}),
+	.m_axis_tdata(s_axis_table_request_tdata),
+	.m_axis_tuser(s_axis_table_request_tuser),
 	.m_axis_tvalid(s_axis_table_request_tvalid),
 	.m_axis_tready(s_axis_table_request_tready),
 	.m_axis_tlast()
