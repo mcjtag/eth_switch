@@ -41,17 +41,20 @@
 module axis_interconnect #(
 	parameter CHANNELS_IN = 4,
 	parameter CHANNELS_OUT = 1,
-	parameter DATA_WIDTH = 8
+	parameter DATA_WIDTH = 8,
+	parameter USER_WIDTH = 2
 )
 (
 	input wire aclk,
 	input wire aresetn,
 	input wire [CHANNELS_IN*DATA_WIDTH-1:0]s_axis_tdata,
 	input wire [CHANNELS_IN*$clog2(CHANNELS_OUT)-1:0]s_axis_tdest,
+	input wire [CHANNELS_IN*USER_WIDTH-1:0]s_axis_tuser,
 	input wire [CHANNELS_IN-1:0]s_axis_tvalid,
 	output wire [CHANNELS_IN-1:0]s_axis_tready,
 	input wire [CHANNELS_IN-1:0]s_axis_tlast,
 	output wire [CHANNELS_OUT*DATA_WIDTH-1:0]m_axis_tdata,
+	output wire [CHANNELS_OUT*USER_WIDTH-1:0]m_axis_tuser,
 	output wire [CHANNELS_OUT-1:0]m_axis_tvalid,
 	input wire [CHANNELS_OUT-1:0]m_axis_tready,
 	output wire [CHANNELS_OUT-1:0]m_axis_tlast	
@@ -72,16 +75,19 @@ generate
 			.CHAN_NUM(CHANNELS_IN),
 			.DATA_WIDTH(DATA_WIDTH),
 			.DEST_INDEX(g),
-			.DEST_WIDTH($clog2(CHANNELS_OUT))
+			.DEST_WIDTH($clog2(CHANNELS_OUT)),
+			.USER_WIDTH(USER_WIDTH)
 		) axis_arbiter_inst (
 			.aclk(aclk),
 			.aresetn(aresetn),
 			.s_axis_tdata(s_axis_tdata),
+			.s_axis_tuser(s_axis_tuser),
 			.s_axis_tdest(s_axis_tdest),
 			.s_axis_tvalid(s_axis_tvalid),
 			.s_axis_tready(arb_tready[CHANNELS_IN*(g+1)-1-:CHANNELS_IN]),
 			.s_axis_tlast(s_axis_tlast),
 			.m_axis_tdata(m_axis_tdata[DATA_WIDTH*(g+1)-1-:DATA_WIDTH]),
+			.m_axis_tuser(m_axis_tuser[USER_WIDTH*(g+1)-1-:USER_WIDTH]),
 			.m_axis_tvalid(m_axis_tvalid[g]),
 			.m_axis_tready(m_axis_tready[g]),
 			.m_axis_tlast(m_axis_tlast[g])
@@ -98,17 +104,20 @@ module axis_arbiter #(
 	parameter CHAN_NUM = 4,
 	parameter DATA_WIDTH = 8,
 	parameter DEST_INDEX = 0,
-	parameter DEST_WIDTH = 4
+	parameter DEST_WIDTH = 4,
+	parameter USER_WIDTH = 2
 )
 (
 	input wire aclk,
 	input wire aresetn,
 	input wire [DATA_WIDTH*CHAN_NUM-1:0]s_axis_tdata,
+	input wire [USER_WIDTH*CHAN_NUM-1:0]s_axis_tuser,
 	input wire [CHAN_NUM*DEST_WIDTH-1:0]s_axis_tdest,
 	input wire [CHAN_NUM-1:0]s_axis_tvalid,
 	output wire [CHAN_NUM-1:0]s_axis_tready,
 	input wire [CHAN_NUM-1:0]s_axis_tlast,
 	output wire [DATA_WIDTH-1:0]m_axis_tdata,
+	output wire [USER_WIDTH-1:0]m_axis_tuser,
 	output wire m_axis_tvalid,
 	input wire m_axis_tready,
 	output wire m_axis_tlast
@@ -135,9 +144,10 @@ generate for (g = 0; g < CHAN_NUM; g = g + 1) begin
 	end
 end endgenerate
 
-assign m_axis_tdata = s_axis_tdata[DATA_WIDTH*(curr+1)-1-:DATA_WIDTH];
+assign m_axis_tdata = axis_tvalid[curr] ? s_axis_tdata[DATA_WIDTH*(curr+1)-1-:DATA_WIDTH] : 0;
+assign m_axis_tuser = axis_tvalid[curr] ? s_axis_tuser[USER_WIDTH*(curr+1)-1-:USER_WIDTH] : 0;
 assign m_axis_tvalid = aresetn ? axis_tvalid[curr] : 1'b0;
-assign m_axis_tlast = s_axis_tlast[curr];
+assign m_axis_tlast = s_axis_tlast[curr] & axis_tvalid[curr];
 
 always @(posedge aclk) begin
 	if (aresetn == 1'b0) begin
