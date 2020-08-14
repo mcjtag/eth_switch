@@ -84,36 +84,42 @@ localparam [47:0]MAC_BROADCAST = 48'hFFFFFFFFFFFF;
 localparam MAC_DST_THRE = 6;
 localparam MAC_SRC_THRE = 12;
 
-localparam STATE_STARTUP = 0;
-localparam STATE_IDLE = 1;
-localparam STATE_INCOME = 2;
-localparam STATE_CHECK = 3;
-localparam STATE_ADDR_REQUEST = 4;
-localparam STATE_ADDR_RESPONSE = 5;
-localparam STATE_DROP = 6;
-localparam STATE_OUTCOME = 7;
-localparam STATE_BROADCAST = 8; // +FLOODING
-localparam STATE_FLUSHING = 9;
+localparam [3:0]
+	STATE_STARTUP = 0,
+	STATE_IDLE = 1,
+	STATE_INCOME = 2,
+	STATE_CHECK = 3,
+	STATE_ADDR_REQUEST = 4,
+	STATE_ADDR_RESPONSE = 5,
+	STATE_DROP = 6,
+	STATE_OUTCOME = 7,
+	STATE_BROADCAST = 8, 	// +FLOODING
+	STATE_FLUSHING = 9;
 
-localparam [1:0]MUX_NONE = 2'b00;
-localparam [1:0]MUX_EXT = 2'b01;
-localparam [1:0]MUX_LOOP = 2'b10;
-localparam [1:0]MUX_FLUSH = 2'b11;
-localparam [1:0]DEMUX_NONE = 2'b00;
-localparam [1:0]DEMUX_EXT = 2'b01;
-localparam [1:0]DEMUX_LOOP = 2'b10;
-localparam [1:0]DEMUX_BROAD = 2'b11;
+localparam [1:0]
+	MUX_NONE = 2'b00,
+	MUX_EXT = 2'b01,
+	MUX_LOOP = 2'b10,
+	MUX_FLUSH = 2'b11;
 
-localparam [3:0]FLOW_FORBIDDEN = {DEMUX_NONE,MUX_NONE};
-localparam [3:0]FLOW_FLUSH = {DEMUX_NONE,MUX_FLUSH};
-localparam [3:0]FLOW_INCOMING = {DEMUX_NONE,MUX_EXT};
-localparam [3:0]FLOW_LOOPBACK = {DEMUX_BROAD,MUX_LOOP};
-localparam [3:0]FLOW_OUTCOMING = {DEMUX_EXT,MUX_NONE};
-localparam [3:0]FLOW_THROUGH = {DEMUX_EXT,MUX_EXT};
+localparam [1:0]
+	DEMUX_NONE = 2'b00,
+	DEMUX_EXT = 2'b01,
+	DEMUX_LOOP = 2'b10,
+	DEMUX_BROAD = 2'b11;
 
-localparam TABLE_STATUS_OK = 0;
-localparam TABLE_STATUS_NOTINTABLE = 1;
-localparam TABLE_STATUS_ERROR = 2;
+localparam [3:0]
+	FLOW_FORBIDDEN = {DEMUX_NONE,MUX_NONE},
+	FLOW_FLUSH = {DEMUX_NONE,MUX_FLUSH},
+	FLOW_INCOMING = {DEMUX_NONE,MUX_EXT},
+	FLOW_LOOPBACK = {DEMUX_BROAD,MUX_LOOP},
+	FLOW_OUTCOMING = {DEMUX_EXT,MUX_NONE},
+	FLOW_THROUGH = {DEMUX_EXT,MUX_EXT};
+
+localparam [3:0]
+	TABLE_STATUS_OK = 0,
+	TABLE_STATUS_NOTINTABLE = 1,
+	TABLE_STATUS_ERROR = 2;
 
 /* Validation */
 wire income_valid;
@@ -272,8 +278,7 @@ always @(posedge aclk) begin
 		mac_src <= 0;
 	end else begin
 		if (income_valid == 1'b1) begin
-		    mac_tmp[7:0] <= s_axis_tdata;
-			mac_tmp[47:8] <= mac_tmp[39:0];
+		    mac_tmp <= {mac_tmp[39:0],s_axis_tdata};
 			case (byte_counter)
 			MAC_DST_THRE: mac_dst <= mac_tmp;
 			MAC_SRC_THRE: mac_src <= mac_tmp;
