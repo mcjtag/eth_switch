@@ -62,14 +62,11 @@ module mactable #(
 	input wire s_axis_table_config_tvalid
 );
 
-localparam [2:0]
+localparam [1:0]
 	STATE_REQUEST = 0,
-	STATE_DST_RESOLVE_REQ = 1,
-	STATE_DST_RESOLVE_RES = 2,
-	STATE_DST_RESPONSE = 3,
-	STATE_SRC_RESOLVE_REQ = 4,
-	STATE_SRC_RESOLVE_RES = 5,
-	STATE_SRC_UPDATE = 6;
+	STATE_RESOLVE = 1,
+	STATE_RESPONSE = 2,
+	STATE_UPDATE = 3;
 
 localparam [3:0]
 	STATUS_OK = 0,		/* Okay */
@@ -77,10 +74,10 @@ localparam [3:0]
 	STATUS_ERR = 2;		/* Error */
 
 localparam CONFIG_WIDTH = ADDR_WIDTH+PORT_WIDTH+48;
-localparam RESPONSE_WIDTH = ADDR_WIDTH+PORT_WIDTH;
-localparam REQUEST_WIDTH = 48;
+localparam RESPONSE_WIDTH = (ADDR_WIDTH+PORT_WIDTH)*2;
+localparam REQUEST_WIDTH = 48*2;
 
-reg [2:0]state;
+reg [1:0]state;
 reg [3:0]status;
 
 reg req_ready;
@@ -91,7 +88,7 @@ reg [47:0]mac_dst;
 reg [PORT_WIDTH-1:0]port_src;
 reg [PORT_WIDTH-1:0]port_dst;
 reg [ADDR_WIDTH-1:0]port_addr;
-reg [ADDR_WIDTH-1:0]curr_addr;
+reg [ADDR_WIDTH-1:0]next_addr;
 
 reg [CONFIG_WIDTH-1:0]config_data;
 reg config_user;
@@ -100,16 +97,21 @@ reg [REQUEST_WIDTH-1:0]request_data;
 reg request_valid;
 wire request_ready;
 wire [RESPONSE_WIDTH-1:0]response_data;
-wire response_user;
+wire [1:0]response_user;
 wire response_valid;
 wire [CONFIG_WIDTH-1:0]axis_config_data;
 wire axis_config_user;
 wire axis_config_valid;
 
+wire [PORT_WIDTH-1:0]response_port[1:0];
+wire [ADDR_WIDTH-1:0]response_addr[1:0];
+
 assign s_axis_table_request_tready = req_ready;
 assign m_axis_table_response_tdata = status;
 assign m_axis_table_response_tuser = {port_src,port_dst};
 assign m_axis_table_response_tvalid = res_valid;
+
+assign {response_port[1],response_addr[1],response_port[0],response_addr[0]} = response_data;
 
 generate if (MODE == "dynamic") begin
 	assign axis_config_data = config_data;
@@ -130,10 +132,7 @@ always @(posedge aclk) begin
 		port_addr <= 0;
 		status <= 0;
 		request_valid <= 1'b0;
-		curr_addr <= 0;
-		config_data <= 0;
-		config_user <= 1'b0;
-		config_valid <= 1'b0;
+		next_addr <= 0;
 		state <= STATE_REQUEST;
 	end else begin
 		case (state)
@@ -141,73 +140,50 @@ always @(posedge aclk) begin
 			if ((s_axis_table_request_tvalid == 1'b1) && (s_axis_table_request_tready == 1'b1)) begin
 				{mac_src,mac_dst} <= s_axis_table_request_tdata;
 				port_src <= s_axis_table_request_tuser;
-				state <= STATE_DST_RESOLVE_REQ;
-			end
-		end
-		STATE_DST_RESOLVE_REQ: begin
-			if (request_valid == 1'b0) begin
 				request_valid <= 1'b1;
-				request_data <= mac_dst;
-			end else begin
-				if (request_ready == 1'b1) begin
-					request_valid <= 1'b0;
-					state <= STATE_DST_RESOLVE_RES;
-				end
+				request_data <= s_axis_table_request_tdata;
+				state <= STATE_RESOLVE;
 			end
 		end
-		STATE_DST_RESOLVE_RES: begin
+		STATE_RESOLVE: begin
+			if (request_ready == 1'b1) begin
+				request_valid <= 1'b0;
+			end
 			if (response_valid == 1'b1) begin
-				{port_dst, port_addr} <= response_data;
-				if (response_user == 1'b1) begin
+				port_dst <= response_port[0];
+				if (response_user[0] == 1'b1) begin
 					status <= STATUS_NIT;
 				end else begin
 					status <= STATUS_OK;
 				end
-				state <= STATE_DST_RESPONSE;
-			end
-		end
-		STATE_DST_RESPONSE: begin
-			if (MODE == "dynamic") begin
-				state <= STATE_SRC_RESOLVE_REQ;
-			end else begin
-				state <= STATE_REQUEST;
-			end
-		end
-		STATE_SRC_RESOLVE_REQ: begin
-			if (request_valid == 1'b0) begin
-				request_valid <= 1'b1;
-				request_data <= mac_src;
-			end else begin
-				if (request_ready == 1'b1) begin
-					request_valid <= 1'b0;
-					state <= STATE_SRC_RESOLVE_RES;
-				end
-			end
-		end
-		STATE_SRC_RESOLVE_RES: begin
-			if (response_valid == 1'b1) begin
-				if (response_user == 1'b1) begin
-					state <= STATE_SRC_UPDATE;
-				end else begin
-					port_addr <= response_data[ADDR_WIDTH-1:0];
-					if (port_src == response_data[ADDR_WIDTH+PORT_WIDTH-1:ADDR_WIDTH]) begin
-						state <= STATE_REQUEST;
+				
+				if (response_user[1] == 1'b1) begin
+					if (MODE == "dynamic") begin
+						port_addr <= next_addr;
+						next_addr <= next_addr + 1;
+						state <= STATE_UPDATE;
 					end else begin
-						state <= STATE_SRC_UPDATE;	
+						state <= STATE_RESPONSE;
+					end
+				end else begin
+					if (port_src == response_port[1]) begin
+						state <= STATE_RESPONSE;
+					end else begin
+						if (MODE == "dynamic") begin
+							port_addr <= response_addr[1];
+							state <= STATE_UPDATE;
+						end else begin
+							state <= STATE_RESPONSE;
+						end
 					end
 				end
 			end
 		end
-		STATE_SRC_UPDATE: begin
-			if (config_valid == 1'b0) begin
-				config_valid <= 1'b1;
-				config_data <= {mac_src,port_src,curr_addr};
-				config_user <= 1'b0;
-				curr_addr <= curr_addr + 1;
-			end else begin
-				config_valid <= 1'b0;
-				state <= STATE_REQUEST;
-			end
+		STATE_RESPONSE: begin
+			state <= STATE_REQUEST;
+		end
+		STATE_UPDATE: begin
+			state <= STATE_REQUEST;
 		end
 		default: state <= STATE_REQUEST;
 		endcase
@@ -215,23 +191,34 @@ always @(posedge aclk) begin
 end
 
 always @(*) begin
+	config_user <= 1'b0;
+	config_data <= {mac_src,port_src,port_addr};
+
 	case (state)
 	STATE_REQUEST: begin
 		req_ready <= 1'b1;
 		res_valid <= 1'b0;
+		config_valid <= 1'b0;
 	end
-	STATE_DST_RESPONSE: begin
+	STATE_RESPONSE: begin
 		req_ready <= 1'b0;
 		res_valid <= 1'b1;
+		config_valid <= 1'b0;
+	end
+	STATE_UPDATE: begin
+		req_ready <= 1'b0;
+		res_valid <= 1'b1;
+		config_valid <= 1'b1;
 	end
 	default: begin
 		req_ready <= 1'b0;
 		res_valid <= 1'b0;
+		config_valid <= 1'b0;
 	end
 	endcase
 end
 
-mactable_cam #(
+mactable_dpcam #(
 	.ADDR_WIDTH(ADDR_WIDTH),
 	.KEY_WIDTH(48),
 	.DATA_WIDTH(PORT_WIDTH),
@@ -239,7 +226,7 @@ mactable_cam #(
 	.CONFIG_WIDTH(CONFIG_WIDTH),
 	.REQUEST_WIDTH(REQUEST_WIDTH),
 	.RESPONSE_WIDTH(RESPONSE_WIDTH)
-) mactable_cam_inst (
+) mactable_dpcam_inst (
 	.aclk(aclk),
 	.aresetn(aresetn),
 	.s_axis_config_tdata(axis_config_data),
