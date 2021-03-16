@@ -164,8 +164,8 @@ axis_interconnect #(
 mactable #(
 	.ADDR_WIDTH(ADDR_WIDTH),
 	.PORT_WIDTH(PORT_WIDTH),
-	.RAM_STYLE_DATA("block"),
-	.MODE("dynamic")
+	.RAM_STYLE_DATA(RAM_STYLE_DATA),
+	.MODE(MODE)
 ) mactable_inst (
 	.aclk(aclk),
 	.aresetn(aresetn),
