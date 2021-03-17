@@ -7,6 +7,9 @@
 * CRC Checking
 * Static or Dynamic MAC-Table
 
+## Compatible Ethernet Frame
+![eth_frame structure](/img/eth_frame.gif)
+
 ## Common Ethernet Switch Structure
 
 ![eth_switch structure](/img/eth_structure.gif)
