@@ -39,13 +39,13 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 module eth_switch #(
-	parameter PORT_NUM = 8,
+	parameter PORT_NUM = 4,
 	parameter ADDR_WIDTH = 8,
 	parameter ETHERNET_MTU = 1500,
-	parameter FLOODING_ENABLE = 0,
+	parameter FLOODING_ENABLE = 1,
 	parameter CRC_CHECK = 0,
 	parameter RAM_STYLE_DATA = "block",	/* "block" or "distributed" */
-	parameter MODE = "static"			/* "static or "dynamic" */
+	parameter MODE = "dynamic"			/* "static or "dynamic" */
 )
 (
 	input wire aclk,
@@ -124,16 +124,19 @@ end endgenerate
 axis_interconnect #(
 	.CHANNELS_IN(PORT_NUM),
 	.CHANNELS_OUT(PORT_NUM),
-	.DATA_WIDTH(8)
+	.DATA_WIDTH(8),
+	.USER_WIDTH(1)
 ) axis_interconnect_channel (
 	.aclk(aclk),
 	.aresetn(aresetn),
 	.s_axis_tdata(m_axis_chan_tdata),
 	.s_axis_tdest(m_axis_chan_tdest),
+	.s_axis_tuser(0),
 	.s_axis_tvalid(m_axis_chan_tvalid),
 	.s_axis_tready(m_axis_chan_tready),
 	.s_axis_tlast(m_axis_chan_tlast),
 	.m_axis_tdata(m_axis_tdata),
+	.m_axis_tuser(),
 	.m_axis_tvalid(m_axis_tvalid),
 	.m_axis_tready(m_axis_tready),
 	.m_axis_tlast(m_axis_tlast)

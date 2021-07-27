@@ -38,11 +38,12 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
+(* KEEP_HIERARCHY = "YES" *)
 module channel_in #(
 	parameter PORT_ADDR = 0,
-	parameter PORT_HIGH = 15,
+	parameter PORT_HIGH = 3,
 	parameter ETHERNET_MTU = 1500,
-	parameter FLOODING_ENABLE = 0,
+	parameter FLOODING_ENABLE = 1,
 	parameter CRC_CHECK = 0,
 	parameter PORT_WIDTH = $clog2(PORT_HIGH+1)
 )
@@ -641,8 +642,10 @@ always @(*) begin
 	end else begin
 		case (select)
 		2'b00: begin // none
+			tdata <= 0;
 			tvalid <= 1'b0;
 			tready <= 2'b00;
+			tlast <= 1'b0;
 		end
 		2'b01: begin // s0
 			tdata <= s0_axis_tdata;
@@ -657,8 +660,10 @@ always @(*) begin
 			tlast <= s1_axis_tlast;
 		end
 		2'b11: begin // flush all
+			tdata <= 0;
 			tvalid <= 1'b0;
 			tready <= 2'b11;
+			tlast <= 1'b0;
 		end
 		endcase
 	end
@@ -714,25 +719,30 @@ always @(*) begin
 	end else begin
 		case (select)
 			2'b00: begin // none
+				tdata[0] <= 0;
+				tdata[1] <= 0;
 				tready <= 1'b0;
 				tvalid <= 2'b00;
+				tlast <= 2'b00;
 			end
 			2'b01: begin // m0
-				tready <= m0_axis_tready;
 				tdata[0] <= s_axis_tdata;
+				tdata[1] <= 0;
+				tready <= m0_axis_tready;
 				tvalid <= {1'b0,s_axis_tvalid};
-				tlast[0] <= s_axis_tlast;
+				tlast <= {1'b0,s_axis_tlast};
 			end
 			2'b10: begin // m1
-				tready <= m1_axis_tready;
+				tdata[0] <= 0;
 				tdata[1] <= s_axis_tdata;
+				tready <= m1_axis_tready;
 				tvalid <= {s_axis_tvalid,1'b0};
-				tlast[1] <= s_axis_tlast;
+				tlast <= {s_axis_tlast,1'b0};
 			end
 			2'b11: begin // m0 & m1 (broadcast)
-				tready <= m0_axis_tready & m1_axis_tready;
 				tdata[0] <= s_axis_tdata;
 				tdata[1] <= s_axis_tdata;
+				tready <= m0_axis_tready & m1_axis_tready;
 				tvalid <= {s_axis_tvalid,s_axis_tvalid} & {tready,tready};
 				tlast <= {2{s_axis_tlast}};
 			end

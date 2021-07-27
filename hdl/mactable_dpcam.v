@@ -44,8 +44,8 @@ module mactable_dpcam #(
 	parameter DATA_WIDTH = 4,
 	parameter RAM_STYLE_DATA = "block",
 	parameter CONFIG_WIDTH = ADDR_WIDTH+DATA_WIDTH+KEY_WIDTH,
-	parameter REQUEST_WIDTH = KEY_WIDTH,
-	parameter RESPONSE_WIDTH = ADDR_WIDTH+DATA_WIDTH
+	parameter REQUEST_WIDTH = KEY_WIDTH*2,
+	parameter RESPONSE_WIDTH = (ADDR_WIDTH+DATA_WIDTH)*2
 )
 (
 	input wire aclk,
@@ -54,11 +54,11 @@ module mactable_dpcam #(
 	input wire s_axis_config_tuser,
 	input wire s_axis_config_tvalid,
 	/* Request */
-	input wire [REQUEST_WIDTH*2-1:0]s_axis_request_tdata,
+	input wire [REQUEST_WIDTH-1:0]s_axis_request_tdata,
 	input wire s_axis_request_tvalid,
 	output wire s_axis_request_tready,
 	/* Response */
-	output wire [RESPONSE_WIDTH*2-1:0]m_axis_response_tdata,
+	output wire [RESPONSE_WIDTH-1:0]m_axis_response_tdata,
 	output wire [1:0]m_axis_response_tuser,
 	output wire m_axis_response_tvalid	
 );
@@ -180,6 +180,7 @@ endmodule
 // Description: Dual Port CAM Index Memory Array
 //////////////////////////////////////////////////////////////////////////////////
 
+(* DONT_TOUCH = "TRUE" *)
 module mactable_dpcam_line_array #(
 	parameter ADDR_WIDTH = 8,
 	parameter KEY_WIDTH = 8

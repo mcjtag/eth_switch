@@ -60,7 +60,7 @@ Arbiter scheduling: Round-Robin
 
 ### Data Format
 * s_axis_tdata[8\*1-1-:8]        - Channel #0 Data 
-* s_axis_tdata[8\*1-1-:8]        - Channel #1 Data
+* s_axis_tdata[8\*2-1-:8]        - Channel #1 Data
 * ...
 * s_axis_tdata[8\*PORT_NUM-1-:8] - Channel #(PORT_NUM-1) Data
 
