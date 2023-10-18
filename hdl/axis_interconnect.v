@@ -126,6 +126,7 @@ module axis_arbiter #(
 localparam PTR_WIDTH = $clog2(CHAN_NUM);
 
 reg [PTR_WIDTH-1:0]curr;
+reg curr_wrap;
 reg [PTR_WIDTH-1:0]next;
 reg act;
 wire [CHAN_NUM-1:0]axis_tvalid;
@@ -183,17 +184,21 @@ end
 
 always @(*) begin
 	curr = next;
+	curr_wrap = 1'b1;
 	if (act == 1'b0) begin
 		for (i = 0; i < CHAN_NUM; i = i + 1) begin
 			if (i == next) begin
-				for (j = 0; j < i; j = j + 1) begin
-					if (axis_tvalid[j]) begin
-						curr = j;
-					end
-				end
 				for (j = (CHAN_NUM - 1); j >= i; j = j - 1) begin
 					if (axis_tvalid[j]) begin
 						curr = j;
+						curr_wrap = 1'b0;
+					end
+				end
+				if (curr_wrap == 1'b1) begin
+					for (j = i - 1; j >= 0; j = j - 1) begin
+						if (axis_tvalid[j]) begin
+							curr = j;
+						end
 					end
 				end
 			end
